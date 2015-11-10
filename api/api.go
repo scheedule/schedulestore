@@ -40,6 +40,7 @@ type Api struct {
 func (a *Api) HandleLookup(w http.ResponseWriter, r *http.Request) {
 	user_id := r.Header.Get("user_id")
 	if user_id == "" {
+		log.Warn("Lookup failed to have user_id set")
 		handleError(w, BadRequestError)
 		return
 	}
@@ -61,6 +62,7 @@ func (a *Api) HandleLookup(w http.ResponseWriter, r *http.Request) {
 func (a *Api) HandlePut(w http.ResponseWriter, r *http.Request) {
 	user_id := r.Header.Get("user_id")
 	if user_id == "" {
+		log.Warn("Lookup failed to have user_id set")
 		handleError(w, BadRequestError)
 		return
 	}

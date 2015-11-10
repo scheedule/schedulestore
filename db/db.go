@@ -6,6 +6,7 @@ package db
 
 import (
 	"errors"
+	log "github.com/Sirupsen/logrus"
 	"github.com/scheedule/schedulestore/types"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -42,6 +43,7 @@ func (db *DB) Init() error {
 	// Initiate DB connection
 	session, err := mgo.DialWithTimeout(db.server, 5*time.Second)
 	if err != nil {
+		log.Error("Failed to dial database:", err)
 		return err
 	}
 
@@ -65,10 +67,13 @@ func (db *DB) Close() {
 
 // Put Schedule into the database
 func (db *DB) Put(entry types.Schedule) error {
-	// TODO make sure we aren't insterting a duplicate
+	log.Debug("Inputing Schedule into database:", entry)
 	_, err := db.collection.Upsert(bson.M{
 		"user_id": entry.UserID,
 	}, entry)
+	if err != nil {
+		log.Error("Schedule failed to be input")
+	}
 	return err
 }
 
@@ -81,6 +86,7 @@ func (db *DB) Lookup(user_id string) (*types.Schedule, error) {
 	}).One(temp)
 
 	if err != nil {
+		log.Debug("Did not find schedule for user_id:", user_id)
 		return nil, ScheduleNotFound
 	}
 

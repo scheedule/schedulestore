@@ -20,7 +20,10 @@ var ScheduleStoreCmd = &cobra.Command{
 
 		// Create DB Object
 		mydb := db.NewDB(db_host, db_port, database, collection)
-		mydb.Init()
+		err := mydb.Init()
+		if err != nil {
+			log.Fatal("DB failure: ", err)
+		}
 
 		// API Object
 		myapi := &api.Api{mydb}
