@@ -6,43 +6,43 @@ import (
 	"testing"
 )
 
-func TestNewDB(t *testing.T) {
-	mydb := NewDB(os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_NAME"), os.Getenv("DB_COLLECTION"))
-	if mydb == nil {
+func TestNew(t *testing.T) {
+	myDB := New(os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_NAME"), os.Getenv("DB_COLLECTION"))
+	if myDB == nil {
 		t.Fail()
 	}
 }
 
 func TestInit(t *testing.T) {
-	mydb := NewDB(os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_NAME"), os.Getenv("DB_COLLECTION"))
-	err := mydb.Init()
+	myDB := New(os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_NAME"), os.Getenv("DB_COLLECTION"))
+	err := myDB.Init()
 	if err != nil {
 		t.Error("Failed to initialize DB:", err)
 	}
-	if mydb.session == nil {
+	if myDB.session == nil {
 		t.Error("Session is nil")
 	}
-	if mydb.collection == nil {
+	if myDB.collection == nil {
 		t.Error("Collection is nil")
 	}
 }
 
 func getDB() *DB {
-	mydb := NewDB(os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_NAME"), os.Getenv("DB_COLLECTION"))
-	_ = mydb.Init()
-	return mydb
+	myDB := New(os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_NAME"), os.Getenv("DB_COLLECTION"))
+	_ = myDB.Init()
+	return myDB
 }
 
 var sampleSchedule = types.Schedule{
-	UserID: "1",
-	CRNs:   []string{"1", "2"},
+	Name:    "1",
+	CRNList: []string{"1", "2"},
 }
 
 func TestPurge(t *testing.T) {
-	mydb := getDB()
-	mydb.Put(sampleSchedule)
-	mydb.Purge()
-	_, err := mydb.Lookup("1")
+	myDB := getDB()
+	myDB.Put("fake", sampleSchedule)
+	myDB.Purge()
+	_, err := myDB.Lookup("1")
 	if err == nil {
 		t.Errorf("Database should be empty but returned no error when looked up schedule.")
 	}
@@ -55,34 +55,31 @@ func TestClose(t *testing.T) {
 		}
 	}()
 
-	mydb := getDB()
-	mydb.Close()
-	_ = mydb.session.Ping()
+	myDB := getDB()
+	myDB.Close()
+	_ = myDB.session.Ping()
 }
 
 func TestPut(t *testing.T) {
-	mydb := getDB()
-	mydb.Purge()
+	myDB := getDB()
+	myDB.Purge()
 
-	err := mydb.Put(sampleSchedule)
+	err := myDB.Put("fake", sampleSchedule)
 	if err != nil {
 		t.Error("Put returned error: ", err)
 	}
 }
 
 func TestLookup(t *testing.T) {
-	mydb := getDB()
-	mydb.Purge()
+	myDB := getDB()
+	myDB.Purge()
 
-	err := mydb.Put(sampleSchedule)
+	err := myDB.Put("fake", sampleSchedule)
 	if err != nil {
 		t.Error("Put returned error: ", err)
 	}
-	schedule, err := mydb.Lookup("1")
+	_, err = myDB.Lookup("fake")
 	if err != nil {
 		t.Error("Schedule lookup returned error: ", err)
-	}
-	if schedule.CRNs[0] != "1" || schedule.CRNs[1] != "2" {
-		t.Error("Lookup result inaccurate: ", schedule)
 	}
 }

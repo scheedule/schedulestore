@@ -1,4 +1,4 @@
-// Package api offers routes to expose an API for users to store and retrieve
+// Package API offers routes to expose an API for users to store and retrieve
 // schedules. The "user_id" header must be set to know who's schedule is being
 // retrieved or saved.
 package api
@@ -6,120 +6,134 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"net/http"
+
 	log "github.com/Sirupsen/logrus"
+
 	"github.com/scheedule/schedulestore/db"
 	"github.com/scheedule/schedulestore/types"
-	"io/ioutil"
-	"net/http"
 )
 
 var (
-	BadRequestError = errors.New("The request was malformed")
-	DBError         = errors.New("Query to database failed.")
-	UnmarshalError  = errors.New("Error unmarshalling data from the database")
+	BadRequestError   = errors.New("The request was malformed.")
+	DBError           = errors.New("Query to database failed.")
+	UnmarshalError    = errors.New("Error unmarshalling data from the database.")
+	UnauthorizedError = errors.New("Unauthorized.")
+	errorMap          = map[error]int{
+		UnauthorizedError: http.StatusUnauthorized,
+		BadRequestError:   http.StatusBadRequest,
+		DBError:           http.StatusNotFound,
+		UnmarshalError:    http.StatusInternalServerError,
+	}
 )
 
-// Write the appropriate message to the client
-func handleError(w http.ResponseWriter, err error) {
-	switch err {
-	case BadRequestError:
-		http.Error(w, err.Error(), http.StatusBadRequest)
-	case DBError:
-		http.Error(w, err.Error(), http.StatusNotFound)
-	case UnmarshalError:
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
 // Simply contains a DB. Mainly for attaching functions.
-type Api struct {
-	Mydb *db.DB
+type API struct {
+	db *db.DB
 }
 
-// HTTP Handler to lookup schedule and write it as a response
-func (a *Api) HandleLookup(w http.ResponseWriter, r *http.Request) {
-	user_id := r.Header.Get("user_id")
-	if user_id == "" {
-		log.Warn("Lookup failed to have user_id set")
-		handleError(w, BadRequestError)
+func New(db *db.DB) *API {
+	return &API{db}
+}
+
+func (a *API) Handle(w http.ResponseWriter, r *http.Request) {
+	userID, err := extractUserID(r)
+	log.Debug("received request: ", r)
+	if err != nil {
+		handleError(w, UnauthorizedError)
 		return
 	}
-	log.Debug("Lookup from user_id:", user_id)
 
-	js, err := lookupSchedule(a.Mydb, user_id)
+	switch r.Method {
+	case "GET":
+		a.handleGET(userID, w, r)
+	case "PUT":
+		a.handlePUT(userID, w, r)
+	case "DELETE":
+		a.handleDELETE(userID, w, r)
+	default:
+		handleError(w, BadRequestError)
+	}
+}
+
+func extractUserID(r *http.Request) (string, error) {
+
+	userID := r.Header.Get("user_id")
+	if userID == "" {
+		log.Warn("user_id not set, rejecting.")
+		return "", BadRequestError
+	}
+
+	return userID, nil
+}
+
+func writeJSON(w http.ResponseWriter, content []byte) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(content)
+}
+
+// HTTP handler to lookup schedule and write it as a response
+func (a *API) handleGET(userID string, w http.ResponseWriter, r *http.Request) {
+
+	schedules, err := a.db.Lookup(userID)
 	if err != nil {
-		log.Warn("Lookup failed:", err)
 		handleError(w, err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(js)
-	log.Debug("Lookup successful")
-}
-
-// HTTP Handler to put schedule and respond with success indication
-func (a *Api) HandlePut(w http.ResponseWriter, r *http.Request) {
-	user_id := r.Header.Get("user_id")
-	if user_id == "" {
-		log.Warn("Lookup failed to have user_id set")
-		handleError(w, BadRequestError)
-		return
-	}
-	log.Debug("Put from user_id:", user_id)
-
-	defer r.Body.Close()
-
-	body, err := ioutil.ReadAll(r.Body)
+	js, err := json.Marshal(schedules)
 	if err != nil {
-		log.Warn("Failed to read request:", err)
-		handleError(w, BadRequestError)
-		return
-	}
-
-	proposal := types.ScheduleProposal{}
-	err = json.Unmarshal([]byte(body), &proposal)
-	if err != nil {
-		log.Warn("Failed to unmarshal request:", err)
 		handleError(w, UnmarshalError)
 		return
 	}
 
-	err = putSchedule(a.Mydb, user_id, proposal)
+	writeJSON(w, js)
+}
+
+// HTTP handler to allow clients to add/update schedules
+func (a *API) handlePUT(userID string, w http.ResponseWriter, r *http.Request) {
+
+	defer r.Body.Close()
+
+	log.Debug("going to decode schedule")
+	decoder := json.NewDecoder(r.Body)
+	proposal := types.Schedule{}
+	err := decoder.Decode(&proposal)
 	if err != nil {
-		log.Warn("Failed to put schedule:", err)
+		log.Warn("failed to decode proposed schedule: ", err)
+		handleError(w, UnmarshalError)
+		return
+	}
+
+	log.Debug("proposal: ", proposal)
+	err = a.db.Put(userID, proposal)
+	if err != nil {
+		log.Warn("error putting: ", err)
 		handleError(w, err)
 		return
 	}
 
 	w.WriteHeader(200)
-	log.Debug("Schedule successfully put in DB")
 }
 
-// Helper function to lookup schedule and Marshal given db and user_id
-func lookupSchedule(db *db.DB, user_id string) ([]byte, error) {
-	schedule, err := db.Lookup(user_id)
-	if err != nil {
-		return nil, DBError
+// HHTP handler to allow clients to delete schedules
+func (a *API) handleDELETE(userID string, w http.ResponseWriter, r *http.Request) {
+	scheduleName := r.FormValue("name")
+	if scheduleName == "" {
+		handleError(w, BadRequestError)
+		return
 	}
 
-	js, err := json.Marshal(schedule.CRNs)
+	err := a.db.Delete(userID, scheduleName)
 	if err != nil {
-		return nil, UnmarshalError
+		handleError(w, err)
+		return
 	}
 
-	return js, nil
+	w.WriteHeader(200)
 }
 
-// Helper function to put schedule into the db
-func putSchedule(db *db.DB, user_id string, schedule []string) error {
-	sch := types.Schedule{
-		UserID: user_id,
-		CRNs:   schedule,
-	}
-
-	if err := db.Put(sch); err != nil {
-		return DBError
-	}
-	return nil
+// Write the appropriate message to the client
+func handleError(w http.ResponseWriter, err error) {
+	http.Error(w, err.Error(), errorMap[err])
 }

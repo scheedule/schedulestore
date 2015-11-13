@@ -3,12 +3,15 @@
 package types
 
 type (
-	// JSON query type to unmarshal.
-	ScheduleProposal []string
-
 	// Schedule type to be serialized to BSON and placed in db.
 	Schedule struct {
-		UserID string   `bson:"user_id"`
-		CRNs   []string `bson:"crns"`
+		Name    string   `bson:"name" json:"name"`
+		CRNList []string `bson:"CRNList" json:"CRNList"`
+	}
+
+	// ScheduleSet contains an array of schedules.
+	ScheduleSet struct {
+		UserID    string     `bson:"user_id" json="-"`
+		Schedules []Schedule `bson:"schedules" json="schedules"`
 	}
 )

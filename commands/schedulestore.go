@@ -3,71 +3,72 @@
 package commands
 
 import (
+	"net/http"
+
 	log "github.com/Sirupsen/logrus"
+	"github.com/spf13/cobra"
+
 	"github.com/scheedule/schedulestore/api"
 	"github.com/scheedule/schedulestore/db"
-	"github.com/spf13/cobra"
-	"net/http"
 )
 
 // Main command of the program
-var ScheduleStoreCmd = &cobra.Command{
+var schedulestoreCmd = &cobra.Command{
 	Use:   "schedulestore",
 	Short: "Schedule key value store.",
 	Long:  "Serve storage and retrieval endpoint for schedules.",
 	Run: func(cmd *cobra.Command, args []string) {
-		InitializeConfig()
+		initializeConfig()
 
 		// Create DB Object
-		mydb := db.NewDB(db_host, db_port, database, collection)
-		err := mydb.Init()
+		myDB := db.New(dbHost, dbPort, database, collection)
+		err := myDB.Init()
 		if err != nil {
 			log.Fatal("DB failure: ", err)
 		}
 
 		// API Object
-		myapi := &api.Api{mydb}
+		myAPI := api.New(myDB)
 
-		http.HandleFunc("/lookup", myapi.HandleLookup)
-		http.HandleFunc("/put", myapi.HandlePut)
-		log.Info("Serving on port:", serve_port)
-		http.ListenAndServe(":"+serve_port, nil)
+		http.HandleFunc("/", myAPI.Handle)
+		log.Info("Serving on port:", servePort)
+		http.ListenAndServe(":"+servePort, nil)
 	},
 }
 
-var Verbose bool
-var serve_port, db_host, db_port, database, collection string
+var verbose bool
+var servePort, dbHost, dbPort, database, collection string
 
 // Initialize Flags
 func init() {
-	ScheduleStoreCmd.Flags().BoolVarP(&Verbose, "verbose", "v", false, "verbose output")
+	schedulestoreCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 
-	ScheduleStoreCmd.Flags().StringVarP(
-		&db_host, "db_host", "", "localhost", "Hostname of DB to insert into and retrieve from.")
+	schedulestoreCmd.Flags().StringVarP(
+		&dbHost, "db_host", "", "localhost", "Hostname of DB to insert into and retrieve from.")
 
-	ScheduleStoreCmd.Flags().StringVarP(
-		&db_port, "db_port", "", "27017", "Port to access DB on.")
+	schedulestoreCmd.Flags().StringVarP(
+		&dbPort, "db_port", "", "27017", "Port to access DB on.")
 
-	ScheduleStoreCmd.Flags().StringVarP(
-		&serve_port, "serve_port", "", "5000", "Port to serve endpoint on.")
+	schedulestoreCmd.Flags().StringVarP(
+		&servePort, "serve_port", "", "5000", "Port to serve endpoint on.")
 
-	ScheduleStoreCmd.Flags().StringVarP(
+	schedulestoreCmd.Flags().StringVarP(
 		&database, "db_name", "", "test", "Database name.")
 
-	ScheduleStoreCmd.Flags().StringVarP(
+	schedulestoreCmd.Flags().StringVarP(
 		&collection, "db_collection", "", "schedules", "Collection in database for schedules.")
 }
 
 // Initialize configuration settings
-func InitializeConfig() {
-	if Verbose {
+func initializeConfig() {
+	if verbose {
 		log.SetLevel(log.DebugLevel)
 	}
 }
 
 // Execute schedulestore command
 func Execute() {
-	if err := ScheduleStoreCmd.Execute(); err != nil {
+	if err := schedulestoreCmd.Execute(); err != nil {
 		panic(err)
 	}
 }
