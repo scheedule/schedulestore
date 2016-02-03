@@ -5,8 +5,8 @@ package types
 type (
 	// Schedule type to be serialized to BSON and placed in db.
 	Schedule struct {
-		Name    string   `bson:"name" json:"name"`
-		CRNList []string `bson:"CRNList" json:"CRNList"`
+		Name    string `bson:"name" json:"name"`
+		CRNList []int  `bson:"CRNList" json:"CRNList"`
 	}
 
 	// ScheduleSet contains an array of schedules.

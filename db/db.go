@@ -87,7 +87,7 @@ func (db *DB) Put(userID string, entry types.Schedule) error {
 	// Delete any schedule of such name
 	err := db.Delete(userID, entry.Name)
 	if err != nil {
-		log.Warn("delete failed for put.. who cares.")
+		log.Debug("delete failed for put.. who cares.")
 	}
 
 	_, err = db.collection.Upsert(bson.M{

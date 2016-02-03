@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/gorilla/mux"
 	"github.com/spf13/cobra"
 
 	"github.com/scheedule/schedulestore/api"
@@ -30,18 +31,51 @@ var schedulestoreCmd = &cobra.Command{
 		// API Object
 		myAPI := api.New(myDB)
 
-		http.HandleFunc("/", myAPI.Handle)
+		r := mux.NewRouter()
+
+		r.HandleFunc("/", myAPI.HandleGET).Methods("GET")
+		r.HandleFunc("/", myAPI.HandlePUT).Methods("PUT")
+		r.HandleFunc("/", myAPI.HandleDELETE).Methods("DELETE")
+
+		if !public {
+			http.ListenAndServe(":"+servePort, PrivateMiddleware(r))
+		} else {
+			http.ListenAndServe(":"+servePort, r)
+		}
+
 		log.Info("Serving on port:", servePort)
-		http.ListenAndServe(":"+servePort, nil)
+
 	},
 }
 
-var verbose bool
+func PublicMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Set("user_id", r.RemoteAddr)
+		h.ServeHTTP(w, r)
+	})
+}
+
+func PrivateMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		userID := r.Header.Get("user_id")
+		if userID == "" {
+			log.Warn("user_id not set, rejecting.")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		h.ServeHTTP(w, r)
+	})
+}
+
+var verbose, public bool
 var servePort, dbHost, dbPort, database, collection string
 
 // Initialize Flags
 func init() {
 	schedulestoreCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
+	schedulestoreCmd.Flags().BoolVarP(&public, "public", "p", false, "For debugging, use ip address as user_id")
 
 	schedulestoreCmd.Flags().StringVarP(
 		&dbHost, "db_host", "", "localhost", "Hostname of DB to insert into and retrieve from.")

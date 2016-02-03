@@ -36,47 +36,20 @@ func New(db *db.DB) *API {
 	return &API{db}
 }
 
-func (a *API) Handle(w http.ResponseWriter, r *http.Request) {
-	userID, err := extractUserID(r)
-	log.Debug("received request: ", r)
-	if err != nil {
-		handleError(w, UnauthorizedError)
-		return
-	}
-
-	switch r.Method {
-	case "GET":
-		a.handleGET(userID, w, r)
-	case "PUT":
-		a.handlePUT(userID, w, r)
-	case "DELETE":
-		a.handleDELETE(userID, w, r)
-	default:
-		handleError(w, BadRequestError)
-	}
-}
-
-func extractUserID(r *http.Request) (string, error) {
-
-	userID := r.Header.Get("user_id")
-	if userID == "" {
-		log.Warn("user_id not set, rejecting.")
-		return "", BadRequestError
-	}
-
-	return userID, nil
-}
-
 func writeJSON(w http.ResponseWriter, content []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(content)
 }
 
 // HTTP handler to lookup schedule and write it as a response
-func (a *API) handleGET(userID string, w http.ResponseWriter, r *http.Request) {
+func (a *API) HandleGET(w http.ResponseWriter, r *http.Request) {
+	log.Debug("Handling GET")
+
+	userID := r.Header.Get("user_id")
 
 	schedules, err := a.db.Lookup(userID)
 	if err != nil {
+		log.Debug("Handling Error")
 		handleError(w, err)
 		return
 	}
@@ -91,7 +64,11 @@ func (a *API) handleGET(userID string, w http.ResponseWriter, r *http.Request) {
 }
 
 // HTTP handler to allow clients to add/update schedules
-func (a *API) handlePUT(userID string, w http.ResponseWriter, r *http.Request) {
+func (a *API) HandlePUT(w http.ResponseWriter, r *http.Request) {
+
+	log.Debug("Handling PUT")
+
+	userID := r.Header.Get("user_id")
 
 	defer r.Body.Close()
 
@@ -117,7 +94,12 @@ func (a *API) handlePUT(userID string, w http.ResponseWriter, r *http.Request) {
 }
 
 // HHTP handler to allow clients to delete schedules
-func (a *API) handleDELETE(userID string, w http.ResponseWriter, r *http.Request) {
+func (a *API) HandleDELETE(w http.ResponseWriter, r *http.Request) {
+
+	log.Debug("Handling DELETE")
+
+	userID := r.Header.Get("user_id")
+
 	scheduleName := r.FormValue("name")
 	if scheduleName == "" {
 		handleError(w, BadRequestError)
