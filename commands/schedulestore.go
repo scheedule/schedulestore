@@ -75,7 +75,7 @@ var servePort, dbHost, dbPort, database, collection string
 // Initialize Flags
 func init() {
 	schedulestoreCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
-	schedulestoreCmd.Flags().BoolVarP(&public, "public", "p", false, "For debugging, use ip address as user_id")
+	schedulestoreCmd.Flags().BoolVarP(&public, "public", "p", false, "For demo, use ip address as user_id")
 
 	schedulestoreCmd.Flags().StringVarP(
 		&dbHost, "db_host", "", "localhost", "Hostname of DB to insert into and retrieve from.")
